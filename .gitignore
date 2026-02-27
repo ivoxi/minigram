@@ -36,8 +36,7 @@ coverage/
 Thumbs.db
 
 # IDE/editor
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea/
 *.suo
 *.ntvs*
