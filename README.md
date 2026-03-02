@@ -32,18 +32,6 @@ npm install
 npm run dev
 ```
 
-## Сборка
-
-```bash
-npm run build
-```
-
-## Предпросмотр production-сборки
-
-```bash
-npm run preview
-```
-
 ## Скрипты проекта
 
 - `npm run dev`: запуск Vite dev-сервера
