@@ -1,6 +1,56 @@
 <script setup lang="ts">
+import { onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import ChatList from '../components/ChatList.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import { useChatsStore } from '../stores/useChatsStore'
+import type { Uuid } from '../types/chat'
+
+const chatsStore = useChatsStore();
+const route = useRoute();
+const router = useRouter();
+
+const getRouteChatId = (): Uuid | null => {
+  const rawChatId = route.params.chatId
+  return typeof rawChatId === 'string' ? rawChatId : null
+}
+
+const syncRouteWithStore = async (): Promise<void> => {
+  if (chatsStore.chats.length === 0) {
+    chatsStore.activeChatId = null
+    return
+  }
+
+  const routeChatId = getRouteChatId()
+  const hasRouteChat = routeChatId !== null && chatsStore.chats.some((chat) => chat.chatId === routeChatId)
+
+  if (hasRouteChat && routeChatId !== null) {
+    await chatsStore.selectChat(routeChatId)
+    return
+  }
+
+  const fallbackChatId = chatsStore.chats[0]?.chatId
+  if (!fallbackChatId) return
+
+  await chatsStore.selectChat(fallbackChatId)
+
+  if (routeChatId !== fallbackChatId) {
+    await router.replace({ name: 'chat-by-id', params: { chatId: fallbackChatId } })
+  }
+}
+
+onMounted(async () => {
+  await chatsStore.initialize()
+  await syncRouteWithStore()
+})
+
+watch(
+  () => route.params.chatId,
+  async () => {
+    if (chatsStore.isLoading) return
+    await syncRouteWithStore()
+  },
+)
 </script>
 
 <template>

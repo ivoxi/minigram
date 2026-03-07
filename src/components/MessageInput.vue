@@ -5,11 +5,11 @@ import { useChatsStore } from '../stores/useChatsStore'
 const chatsStore = useChatsStore()
 const messageText = ref('')
 
-const submitMessage = (): void => {
+const submitMessage = async (): Promise<void> => {
   const trimmedValue = messageText.value.trim()
   if (!trimmedValue) return
 
-  chatsStore.sendMessage(trimmedValue)
+  await chatsStore.sendMessage(trimmedValue)
   messageText.value = ''
 }
 </script>
