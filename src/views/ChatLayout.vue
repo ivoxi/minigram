@@ -55,44 +55,40 @@ watch(
 
 <template>
   <v-app>
-    <v-main class="chat-layout">
-      <v-container fluid class="fill-height pa-0">
-        <v-row no-gutters class="chat-row fill-height bg-white">
-          <v-col cols="12" md="4" lg="3" class="chat-list pa-0">
-            <ChatList />
-          </v-col>
-          <v-col cols="12" md="8" lg="9" class="chat-window pa-0">
-            <ChatWindow />
-          </v-col>
-        </v-row>
-      </v-container>
+    <v-main>
+      <div class="chat-layout">
+        <div class="chat-list">
+          <ChatList />
+        </div>
+        <div class="chat-window">
+          <ChatWindow />
+        </div>
+      </div>
     </v-main>
   </v-app>
 </template>
 
 <style scoped>
 .chat-layout {
-  min-height: 100vh;
-}
-
-:deep(.chat-row) {
-  margin: 0 !important;
-  gap: 0 !important;
-}
-
-.chat-list,
-.chat-window {
-  min-height: 50vh;
-  border: 0 !important;
-  outline: 0 !important;
-  box-shadow: none !important;
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  --chat-item-height: 72px;
 }
 
 .chat-list {
+  width: 300px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-right: 1px solid #e2e8f0;
   background: #ffffff;
 }
 
 .chat-window {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
   background: #ffffff;
 }
 </style>

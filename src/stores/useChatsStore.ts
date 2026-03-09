@@ -11,6 +11,7 @@ import type {
   ChatsState,
   GetChatDto,
   GetMessageDto,
+  GetUserDto,
   Uuid,
 } from '../types/chat'
 
@@ -33,8 +34,11 @@ const normalizeMessages = (messages: GetMessageDto[]): GetMessageDto[] => {
     .sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt))
 }
 
-const resolveChatName = (chat: GetChatDto): string => {
-  return chat.name?.trim() || 'Chat'
+const resolveChatName = (chat: GetChatDto, users: GetUserDto[], currentUserId: Uuid | null): string => {
+  if (chat.isGroup) return chat.name?.trim() || 'Group'
+  const otherId = chat.participantUserIds?.find((id) => id !== currentUserId)
+  const other = users.find((u) => u.userId === otherId)
+  return other?.nickname?.trim() || other?.name?.trim() || chat.name?.trim() || 'Unknown'
 }
 
 const resolveErrorMessage = (error: unknown): string => {
@@ -77,7 +81,7 @@ export const useChatsStore = defineStore('chats', {
           const lastMessage = getLastMessage(messages)
           return {
             chatId: chat.chatId,
-            name: resolveChatName(chat),
+            name: resolveChatName(chat, state.users, state.currentUserId),
             lastMessage: lastMessage?.text ?? 'No messages yet',
             time: lastMessage ? formatTime(new Date(lastMessage.sentAt)) : '',
             lastCreatedAt: lastMessage ? Date.parse(lastMessage.sentAt) : 0,
@@ -85,6 +89,10 @@ export const useChatsStore = defineStore('chats', {
         })
         .sort((a, b) => b.lastCreatedAt - a.lastCreatedAt)
         .map(({ lastCreatedAt, ...chat }) => chat)
+    },
+    activeChatDisplayName(): string {
+      if (!this.activeChat) return 'Chat'
+      return resolveChatName(this.activeChat, this.users, this.currentUserId)
     },
     activeMessages(state): ActiveMessage[] {
       if (state.activeChatId === null) return []

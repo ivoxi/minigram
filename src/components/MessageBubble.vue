@@ -1,11 +1,15 @@
 <script setup lang="ts">
 type MessageBubbleProps = {
+  id: string
   text: string
   time: string
   isMine: boolean
 }
 
 const props = defineProps<MessageBubbleProps>()
+
+// Stable pseudo-random based on message id (no backend read tracking yet)
+const isRead = props.id.charCodeAt(0) % 2 === 0
 </script>
 
 <template>
@@ -21,14 +25,19 @@ const props = defineProps<MessageBubbleProps>()
       rounded="xl"
       elevation="0"
     >
-      <p class="mb-1 whitespace-pre-wrap break-words text-body-2">
-        {{ props.text }}
-      </p>
-      <div
-        class="text-right text-caption"
-        :class="props.isMine ? 'text-blue-100' : 'text-slate-500'"
-      >
-        {{ props.time }}
+      <div class="d-flex flex-wrap align-end" style="column-gap: 8px;">
+        <span class="whitespace-pre-wrap break-words text-body-2" style="flex: 1; min-width: 0;">{{ props.text }}</span>
+        <div
+          class="d-flex align-center gap-1 text-caption flex-shrink-0 ms-auto"
+          :class="props.isMine ? 'text-blue-100' : 'text-slate-500'"
+          style="line-height: 1; padding-bottom: 1px;"
+        >
+          {{ props.time }}
+          <template v-if="props.isMine">
+            <v-icon v-if="isRead" size="14" color="light-blue-lighten-3">mdi-check-all</v-icon>
+            <v-icon v-else size="14" color="blue-lighten-4">mdi-check</v-icon>
+          </template>
+        </div>
       </div>
     </v-sheet>
   </v-sheet>

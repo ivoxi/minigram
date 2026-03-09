@@ -18,7 +18,8 @@ const firstLetter = computed(() => props.name.charAt(0).toUpperCase())
 
 <template>
   <v-list-item
-    class="w-full cursor-pointer border-b border-transparent !px-4 !py-3 transition-colors"
+    class="w-full cursor-pointer border-b border-transparent !px-4 transition-colors"
+    :style="{ minHeight: 'var(--chat-item-height, 72px)', height: 'var(--chat-item-height, 72px)' }"
     :class="
       props.active
         ? '!border-blue-200 !bg-blue-100'
