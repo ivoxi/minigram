@@ -5,9 +5,26 @@ import { useChatsStore } from '../stores/useChatsStore'
 const chatsStore = useChatsStore()
 const messageText = ref('')
 
+let stopTypingTimer: ReturnType<typeof setTimeout> | null = null
+
+const onInput = (): void => {
+  chatsStore.notifyTyping()
+  if (stopTypingTimer) clearTimeout(stopTypingTimer)
+  stopTypingTimer = setTimeout(() => {
+    chatsStore.notifyStopTyping()
+    stopTypingTimer = null
+  }, 2000)
+}
+
 const submitMessage = async (): Promise<void> => {
   const trimmedValue = messageText.value.trim()
   if (!trimmedValue) return
+
+  if (stopTypingTimer) {
+    clearTimeout(stopTypingTimer)
+    stopTypingTimer = null
+  }
+  chatsStore.notifyStopTyping()
 
   await chatsStore.sendMessage(trimmedValue)
   messageText.value = ''
@@ -23,6 +40,7 @@ const submitMessage = async (): Promise<void> => {
         density="comfortable"
         hide-details
         placeholder="Type a message..."
+        @input="onInput"
       />
       <v-btn type="submit" color="blue-darken-2" size="large">Send</v-btn>
     </v-form>

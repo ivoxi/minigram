@@ -61,8 +61,35 @@ export type ChatsState = {
   chats: GetChatDto[]
   messagesByChat: Record<Uuid, GetMessageDto[]>
   users: GetUserDto[]
-  currentUserId: Uuid | null
   activeChatId: Uuid | null
+  isLoading: boolean
+  isConnected: boolean
+  typingByChatId: Record<Uuid, Uuid[]>
+  error: string | null
+}
+
+export type RegisterUserDto = {
+  nickname?: string | null
+  name?: string | null
+  phoneNumber?: string | null
+  password?: string | null
+}
+
+export type LoginUserDto = {
+  nickname?: string | null
+  password?: string | null
+}
+
+export type AuthResponseDto = {
+  userId: Uuid
+  nickname: string | null
+  token: string | null
+}
+
+export type AuthState = {
+  userId: Uuid | null
+  nickname: string | null
+  token: string | null
   isLoading: boolean
   error: string | null
 }
