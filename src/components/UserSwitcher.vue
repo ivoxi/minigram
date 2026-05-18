@@ -4,15 +4,22 @@ import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/useAuthStore'
 import { useChatsStore } from '../stores/useChatsStore'
+import { useProfileDialog } from '../composables/useProfileDialog'
 
 const authStore = useAuthStore()
 const chatsStore = useChatsStore()
-const { nickname } = storeToRefs(authStore)
+const { nickname, userId } = storeToRefs(authStore)
+const profileDialog = useProfileDialog()
 const router = useRouter()
 const isOpen = ref(false)
 
 const displayName = computed(() => nickname.value?.trim() || 'Пользователь')
 const firstLetter = computed(() => displayName.value.charAt(0).toUpperCase())
+
+const openProfile = (): void => {
+  isOpen.value = false
+  if (userId.value) profileDialog.open(userId.value)
+}
 
 const logout = async (): Promise<void> => {
   isOpen.value = false
@@ -45,17 +52,29 @@ const logout = async (): Promise<void> => {
       </div>
     </template>
 
-    <v-card min-width="220" elevation="3">
-      <v-list density="compact" class="pa-1">
+    <v-card min-width="220" elevation="6" class="menu-card">
+      <v-list density="compact" class="pa-2 bg-transparent">
         <v-list-item
           rounded="lg"
-          color="red-darken-2"
+          class="mb-1 menu-item"
+          @click="openProfile"
+        >
+          <template #prepend>
+            <v-icon size="18" class="mr-3" color="white">mdi-account</v-icon>
+          </template>
+          <v-list-item-title class="text-sm font-weight-medium text-white">
+            Профиль
+          </v-list-item-title>
+        </v-list-item>
+        <v-list-item
+          rounded="lg"
+          class="menu-item menu-item-danger"
           @click="logout"
         >
           <template #prepend>
-            <v-icon size="18" class="mr-3" color="red-darken-2">mdi-logout</v-icon>
+            <v-icon size="18" class="mr-3" color="white">mdi-logout</v-icon>
           </template>
-          <v-list-item-title class="text-sm font-weight-medium text-red-darken-2">
+          <v-list-item-title class="text-sm font-weight-medium text-white">
             Выйти
           </v-list-item-title>
         </v-list-item>
@@ -63,3 +82,18 @@ const logout = async (): Promise<void> => {
     </v-card>
   </v-menu>
 </template>
+
+<style scoped>
+.menu-card {
+  background: linear-gradient(135deg, #1e40af, #3b82f6) !important;
+}
+
+.menu-item :deep(.v-list-item__overlay) {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.menu-item-danger:hover :deep(.v-list-item__overlay) {
+  background: rgba(239, 68, 68, 0.35) !important;
+  opacity: 1 !important;
+}
+</style>

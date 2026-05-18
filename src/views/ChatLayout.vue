@@ -3,6 +3,9 @@ import { onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ChatList from '../components/ChatList.vue'
 import ChatWindow from '../components/ChatWindow.vue'
+import ProfileDialog from '../components/ProfileDialog.vue'
+import CreateGroupDialog from '../components/CreateGroupDialog.vue'
+import GroupMembersDialog from '../components/GroupMembersDialog.vue'
 import UserSwitcher from '../components/UserSwitcher.vue'
 import { useChatsStore } from '../stores/useChatsStore'
 import type { Uuid } from '../types/chat'
@@ -70,6 +73,9 @@ watch(
           <ChatWindow />
         </div>
       </div>
+      <ProfileDialog />
+      <CreateGroupDialog />
+      <GroupMembersDialog />
     </v-main>
   </v-app>
 </template>

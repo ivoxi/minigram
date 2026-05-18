@@ -6,6 +6,8 @@ type ChatItemProps = {
   lastMessage: string
   time: string
   active?: boolean
+  isGroup?: boolean
+  memberCount?: number
 }
 
 const props = defineProps<ChatItemProps>()
@@ -30,16 +32,33 @@ const firstLetter = computed(() => props.name.charAt(0).toUpperCase())
     @click="$emit('select')"
   >
     <template #prepend>
-      <v-avatar color="blue-grey-lighten-4" class="mr-3 text-slate-700">
-        {{ firstLetter }}
+      <v-avatar
+        :color="props.isGroup ? 'indigo-lighten-4' : 'blue-grey-lighten-4'"
+        class="mr-3 text-slate-700"
+      >
+        <v-icon v-if="props.isGroup" size="22" color="indigo-darken-2">mdi-account-group</v-icon>
+        <template v-else>{{ firstLetter }}</template>
       </v-avatar>
     </template>
 
-    <v-list-item-title class="font-semibold !text-slate-900">
-      {{ props.name }}
+    <v-list-item-title class="font-semibold !text-slate-900 d-flex align-center ga-1">
+      <span class="text-truncate">{{ props.name }}</span>
+      <v-icon
+        v-if="props.isGroup"
+        size="14"
+        color="indigo-darken-2"
+        class="flex-shrink-0"
+        title="Групповой чат"
+      >
+        mdi-account-multiple
+      </v-icon>
     </v-list-item-title>
     <v-list-item-subtitle class="!text-slate-600">
-      {{ props.lastMessage }}
+      <span v-if="props.isGroup" class="group-meta">
+        {{ props.memberCount }} уч.
+      </span>
+      <span v-if="props.isGroup" class="mx-1 !text-slate-400">·</span>
+      <span>{{ props.lastMessage }}</span>
     </v-list-item-subtitle>
 
     <template #append>
@@ -51,5 +70,10 @@ const firstLetter = computed(() => props.name.charAt(0).toUpperCase())
 <style scoped>
 :deep(.v-list-item__overlay) {
   opacity: 0 !important;
+}
+
+.group-meta {
+  color: #4338ca;
+  font-weight: 600;
 }
 </style>

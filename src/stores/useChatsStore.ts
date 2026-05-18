@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import {
+  createChat,
   getChatsByUser,
   getMessagesByChat,
   getUsers,
@@ -7,14 +8,15 @@ import {
 } from '../api/chatApi'
 import { socketService } from '../api/socketService'
 import { useAuthStore } from './useAuthStore'
-import type {
-  ActiveMessage,
-  ChatPreview,
-  ChatsState,
-  GetChatDto,
-  GetMessageDto,
-  GetUserDto,
-  Uuid,
+import {
+  MessageType,
+  type ActiveMessage,
+  type ChatPreview,
+  type ChatsState,
+  type GetChatDto,
+  type GetMessageDto,
+  type GetUserDto,
+  type Uuid,
 } from '../types/chat'
 
 const formatTime = (date: Date): string => {
@@ -70,11 +72,18 @@ export const useChatsStore = defineStore('chats', {
         .map((chat) => {
           const messages = state.messagesByChat[chat.chatId] ?? []
           const lastMessage = getLastMessage(messages)
+          const lastMessageText = lastMessage
+            ? lastMessage.type === MessageType.Voice
+              ? '🎤 Голосовое сообщение'
+              : (lastMessage.text ?? '')
+            : 'No messages yet'
           return {
             chatId: chat.chatId,
             name: resolveChatName(chat, state.users, currentUserId),
-            lastMessage: lastMessage?.text ?? 'No messages yet',
+            lastMessage: lastMessageText,
             time: lastMessage ? formatTime(new Date(lastMessage.sentAt)) : '',
+            isGroup: !!chat.isGroup,
+            memberCount: chat.participantUserIds?.length ?? 0,
             lastCreatedAt: lastMessage ? Date.parse(lastMessage.sentAt) : 0,
           }
         })
@@ -85,6 +94,28 @@ export const useChatsStore = defineStore('chats', {
       if (!this.activeChat) return 'Chat'
       return resolveChatName(this.activeChat, this.users, useAuthStore().userId)
     },
+    activeChatPartnerId(): Uuid | null {
+      const chat = this.activeChat
+      if (!chat || chat.isGroup) return null
+      const currentUserId = useAuthStore().userId
+      return chat.participantUserIds?.find((id) => id !== currentUserId) ?? null
+    },
+    activeChatIsGroup(): boolean {
+      return !!this.activeChat?.isGroup
+    },
+    activeChatMembers(state): GetUserDto[] {
+      const chat = state.chats.find((c) => c.chatId === state.activeChatId)
+      if (!chat?.isGroup) return []
+      const ids = chat.participantUserIds ?? []
+      return ids
+        .map((id) => state.users.find((u) => u.userId === id))
+        .filter((u): u is GetUserDto => !!u)
+    },
+    activeChatMemberCount(): number {
+      const chat = this.activeChat
+      if (!chat?.isGroup) return 0
+      return chat.participantUserIds?.length ?? 0
+    },
     activeChatIsTyping(state): boolean {
       if (!state.activeChatId) return false
       const currentUserId = useAuthStore().userId
@@ -94,13 +125,27 @@ export const useChatsStore = defineStore('chats', {
     activeMessages(state): ActiveMessage[] {
       if (state.activeChatId === null) return []
       const currentUserId = useAuthStore().userId
+      const chat = state.chats.find((c) => c.chatId === state.activeChatId)
+      const isGroup = !!chat?.isGroup
       const messages = state.messagesByChat[state.activeChatId] ?? []
-      return normalizeMessages(messages).map((message) => ({
-        id: message.messageId,
-        text: message.text ?? '',
-        isMine: message.senderUserId === currentUserId,
-        time: formatTime(new Date(message.sentAt)),
-      }))
+      return normalizeMessages(messages).map((message) => {
+        const isMine = message.senderUserId === currentUserId
+        let senderName: string | null = null
+        if (isGroup && !isMine) {
+          const sender = state.users.find((u) => u.userId === message.senderUserId)
+          senderName = sender?.nickname?.trim() || sender?.name?.trim() || 'Unknown'
+        }
+        return {
+          id: message.messageId,
+          type: message.type,
+          text: message.text ?? '',
+          audioUrl: message.audioUrl,
+          audioDurationSeconds: message.audioDurationSeconds,
+          isMine,
+          senderName,
+          time: formatTime(new Date(message.sentAt)),
+        }
+      })
     },
   },
   actions: {
@@ -129,7 +174,7 @@ export const useChatsStore = defineStore('chats', {
 
         this.messagesByChat = Object.fromEntries(messagesByChatEntries)
 
-        socketService.connect(currentUserId)
+        await socketService.connect(currentUserId)
         socketService.onNewMessage((msg) => {
           const chatMessages = this.messagesByChat[msg.chatId] ?? []
           if (chatMessages.some((m) => m.messageId === msg.messageId)) return
@@ -144,6 +189,13 @@ export const useChatsStore = defineStore('chats', {
         socketService.onStopTyping(({ userId, chatId }) => {
           const typers = this.typingByChatId[chatId] ?? []
           this.typingByChatId[chatId] = typers.filter((id) => id !== userId)
+        })
+        socketService.onChatCreated((chat) => {
+          if (this.chats.some((c) => c.chatId === chat.chatId)) return
+          this.chats = [...this.chats, chat]
+          if (!this.messagesByChat[chat.chatId]) {
+            this.messagesByChat = { ...this.messagesByChat, [chat.chatId]: [] }
+          }
         })
         this.isConnected = socketService.isConnected
       } catch (error: unknown) {
@@ -173,9 +225,81 @@ export const useChatsStore = defineStore('chats', {
     notifyStopTyping(): void {
       if (this.activeChatId) socketService.emitStopTyping(this.activeChatId)
     },
+    findDirectChatWith(otherUserId: Uuid): GetChatDto | null {
+      const currentUserId = useAuthStore().userId
+      if (!currentUserId) return null
+      return (
+        this.chats.find((c) => {
+          if (c.isGroup) return false
+          const ids = c.participantUserIds ?? []
+          return ids.length === 2 && ids.includes(currentUserId) && ids.includes(otherUserId)
+        }) ?? null
+      )
+    },
+    async createOrOpenDirectChat(otherUserId: Uuid): Promise<Uuid | null> {
+      const currentUserId = useAuthStore().userId
+      if (!currentUserId || otherUserId === currentUserId) return null
+
+      const existing = this.findDirectChatWith(otherUserId)
+      if (existing) return existing.chatId
+
+      try {
+        const chat = await createChat({
+          isGroup: false,
+          participantUserIds: [currentUserId, otherUserId],
+        })
+        // SignalR ChatCreated broadcast may arrive before this HTTP response.
+        if (!this.chats.some((c) => c.chatId === chat.chatId)) {
+          this.chats = [...this.chats, chat]
+        }
+        if (!this.messagesByChat[chat.chatId]) {
+          this.messagesByChat = { ...this.messagesByChat, [chat.chatId]: [] }
+        }
+        return chat.chatId
+      } catch (e: unknown) {
+        this.error = resolveErrorMessage(e)
+        return null
+      }
+    },
+    async createGroupChat(name: string, participantUserIds: Uuid[]): Promise<Uuid | null> {
+      const currentUserId = useAuthStore().userId
+      if (!currentUserId) return null
+
+      const allParticipants = Array.from(new Set([currentUserId, ...participantUserIds]))
+      try {
+        const chat = await createChat({
+          isGroup: true,
+          name: name.trim() || null,
+          participantUserIds: allParticipants,
+        })
+        if (!this.chats.some((c) => c.chatId === chat.chatId)) {
+          this.chats = [...this.chats, chat]
+        }
+        if (!this.messagesByChat[chat.chatId]) {
+          this.messagesByChat = { ...this.messagesByChat, [chat.chatId]: [] }
+        }
+        return chat.chatId
+      } catch (e: unknown) {
+        this.error = resolveErrorMessage(e)
+        return null
+      }
+    },
+    upsertUser(user: GetUserDto): void {
+      const idx = this.users.findIndex((u) => u.userId === user.userId)
+      if (idx === -1) {
+        this.users = [...this.users, user]
+      } else {
+        this.users = [
+          ...this.users.slice(0, idx),
+          user,
+          ...this.users.slice(idx + 1),
+        ]
+      }
+    },
     reset(): void {
       socketService.offNewMessage()
       socketService.offTyping()
+      socketService.offChatCreated()
       socketService.disconnect()
       this.chats = []
       this.messagesByChat = {}
@@ -188,6 +312,7 @@ export const useChatsStore = defineStore('chats', {
     destroy(): void {
       socketService.offNewMessage()
       socketService.offTyping()
+      socketService.offChatCreated()
       socketService.disconnect()
       this.isConnected = false
     },
@@ -203,6 +328,8 @@ export const useChatsStore = defineStore('chats', {
         })
 
         const nextMessages = this.messagesByChat[this.activeChatId] ?? []
+        // SignalR broadcast may arrive before this HTTP response — check by messageId.
+        if (nextMessages.some((m) => m.messageId === message.messageId)) return
         this.messagesByChat[this.activeChatId] = normalizeMessages([...nextMessages, message])
       } catch (error: unknown) {
         this.error = resolveErrorMessage(error)
